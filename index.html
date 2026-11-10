@@ -1,0 +1,301 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover,interactive-widget=resizes-content" />
+<!-- Pura 70 Ultra APK: paint the document before React/CSS loads.
+     Keep this device gate separate from is-apk (that class also hides the iOS sampler on desktop).
+     The rules live in mobius-boot-paint and disappear when finishSplash runs. -->
+<script>
+(function () {
+  var ua = navigator.userAgent || '';
+  if (location.origin === 'https://localhost' &&
+      /\bHBP-(?:AL00|LX9|L29)\b|Pura[\s_-]*70[\s_-]*Ultra/i.test(ua)) {
+    document.documentElement.classList.add('mobius-pura70-boot');
+  }
+})();
+</script>
+<title>Möbius</title>
+<link rel="preload" as="image" href="./mobius-icon-512.png" fetchpriority="high" />
+
+<!-- 2026-09-04 04:28 她：「我们的这个小手机怎么样能做成pwa？他现在浏览器里面，我想保存
+     下来，没有那个浏览器的那个东西」——装到桌面上、开起来没有地址栏，靠下面这几行 + sw.js。
+     不需要域名：pages.dev 本来就是 https，PWA 的门槛是 https + manifest + service worker。 -->
+<link rel="manifest" href="./manifest.webmanifest?v=ios27-status-20260929" />
+<meta name="theme-color" content="#F2F2F2" />
+<meta name="color-scheme" content="only light" />
+<meta name="mobile-web-app-capable" content="yes" />
+<!-- 苹果那边不认 manifest 的 display，得单独给这两行 -->
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<!-- 2026-09-29 20:39 不能用 black-translucent：iOS 26 的 WebKit bug 301108，桌面图标打开时窗口会短一个状态栏那么高，
+     底栏下面空出一截页面画不到的条（她发来 iOS Chrome 截图，所有带底栏的页都高一节）。default 窗口从状态栏下面开始，高度是对的。 -->
+<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+<!-- 2026-09-30 02:17 她的 iPad（Safari 27）桌面图标打开，电量栏一直是黑的：default 在新版 iPadOS 上就是一条不透明的黑条，
+     theme-color 它不认。iPad 上换回 black-translucent：页面画到电量栏下面，系统能在页面顶边采到实色就用实色，
+     采不到才糊一层玻璃（github.com/cplieger/subflux/pull/960）。顶边的实色由 #mobius-ios-status-sampler 那条保证。
+     iPhone 也换：内测那位 iPhone（iOS 27）同样一打开就黑，而且 09-29 晚上用 black-translucent 那二十来分钟她是好的。
+     301108（窗口短一截）据说 Safari 26.1 起对「fixed 铺满的容器」已经修了，我们的 #root 正是 fixed inset:0——
+     这一条只能真机验：测试链接上看底下有没有空条，有就把 iPhone 退回 default。 -->
+<script>
+  if (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1 || /iPad|iPhone|iPod/.test(navigator.userAgent)) {
+    document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]').setAttribute('content', 'black-translucent');
+    document.documentElement.classList.add('ios-translucent');
+  }
+  /* 2026-10-08 公测第一晚：电脑、iPad 打开，整台手机被拉成一整块宽屏。宽屏（长宽都 ≥600，横过来的手机不算）
+     就不在这一页跑小手机，而是在正中摆一台手机大小的 iframe，同一个地址装进去——框里的世界就是手机尺寸，
+     弹层、vw、innerWidth 全都照手机算，一行页面代码不用改。src/main.tsx 看到 __MOBIUS_HOST 就不开机。 */
+  if (window.self === window.top && innerWidth >= 600 && innerHeight >= 600) {
+    window.__MOBIUS_HOST = true;
+    document.documentElement.classList.add('mobius-host');
+  }
+</script>
+<style>
+  html.mobius-host, html.mobius-host body { margin: 0; height: 100%; overflow: hidden; background: #E9E7E4; }
+  html.mobius-host body { display: flex; align-items: center; justify-content: center; }
+  html.mobius-host #root, html.mobius-host #mobius-ios-status-sampler { display: none !important; }
+  html.mobius-host #mobius-frame {
+    width: var(--fw, 430px); height: var(--fh, 932px); border: 0; display: block;
+    border-radius: 34px; background: #F2F2F2; flex: none; transform: scale(var(--fk, 1));
+    box-shadow: 0 0 0 1px rgba(0,0,0,.06), 0 24px 60px rgba(0,0,0,.14);
+  }
+</style>
+<meta name="apple-mobile-web-app-title" content="Möbius" />
+<link rel="apple-touch-icon" href="./mobius-apple-touch-icon.png?v=20260922-1636" />
+<link rel="icon" href="./mobius-icon-192.png?v=20260922-1636" />
+<!-- 2026-09-30 内测：iOS 一打开顶栏就是黑的。开屏把 html/body 也刷成了黑，Safari/Chrome 开页那一下采的就是它，
+     之后不一定再采。开屏的黑只刷在 #root 上（它本来就铺满全屏，看着一样），html/body 和顶上那条取色条从第一帧就是浅色。 -->
+<!-- 2026-10-16 19:58 她：安卓 App 开屏最上面一道细白边。就是下面那条 1px 取色条（iOS 才用得上，给 Safari 采顶栏色），
+     开屏时它是浅色、叠在最上层，压在黑开屏上就是一道白线；壳子拿网页最上面一行定电量栏图标黑白，采到它还把图标弄成了黑的。
+     APK 里电量栏底下就是网页自己（apk-edge.js），用不着它，藏掉。 -->
+<style id="mobius-boot-paint">#root{background:#050505!important}html,body{margin:0;background:#F2F2F2}html.mobius-pura70-boot,html.mobius-pura70-boot body{background:#050505!important}html.mobius-pura70-boot #root{position:fixed;inset:0}</style>
+<!-- 2026-10-23 12:39 她（安卓包 iMessage 截图）：屏幕最顶上一道纯蓝的线。还是那条取色条：藏它的规则原来写在 mobius-boot-paint 里，
+     开完机 App.tsx 把那份样式整个删了，取色条又露出来；statusBar.ts 拿电量栏底下那块的颜色刷它，iMessage 顶栏底下滚过去的是蓝气泡，就刷成一道蓝。
+     藏它的规则单独放这儿，开机删样式删不到它。 -->
+<style id="mobius-sampler-hide">html.apk-edge #mobius-ios-status-sampler,html.is-apk #mobius-ios-status-sampler{display:none!important}</style>
+<style>
+#mobius-update-pill{box-sizing:border-box;position:fixed;z-index:2147483647;top:104px;top:calc(104px + max(env(safe-area-inset-top,0px),var(--sat,0px)));left:50%;transform:translateX(-50%);width:calc(100% - 28px);max-width:356px;display:grid;grid-template-columns:34px minmax(0,1fr) auto;align-items:center;gap:10px;padding:9px 10px 9px 12px;border-radius:22px;border:1px solid rgba(216,210,226,.8);background:rgba(252,250,255,.97);box-shadow:0 8px 26px rgba(46,34,64,.13),inset 0 1px 0 #fff;color:#332e3c;font:500 13px/1.4 -apple-system,BlinkMacSystemFont,system-ui,sans-serif;text-align:left;color-scheme:light}
+#mobius-update-pill .update-mark{display:grid;place-items:center;width:34px;height:34px;border-radius:12px;background:linear-gradient(145deg,#eee3ef,#e6e3f3);color:#62526f}
+#mobius-update-pill strong{font-size:14px;font-weight:650}
+#mobius-update-pill small{display:block;font-size:12px;margin-top:3px;color:#655e6d}
+#mobius-update-pill small:empty{display:none}
+#mobius-update-pill .update-actions{display:flex;align-items:center;gap:3px}
+#mobius-update-pill button{appearance:none;border:0;margin:0;min-height:44px;min-width:44px;padding:0 8px;border-radius:14px;background:transparent;color:#665b71;line-height:1.2;font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;-webkit-tap-highlight-color:transparent}
+#mobius-update-pill button:last-child{background:#51455e;color:#fff;padding:0 13px}
+#mobius-update-pill button:active{opacity:.78}
+#mobius-update-pill button:focus-visible{outline:2px solid #876e9d;outline-offset:2px}
+@media(max-width:325px){#mobius-update-pill{gap:6px;padding-left:8px;width:calc(100% - 16px)}}
+@media(prefers-reduced-motion:no-preference){#mobius-update-pill{animation:mobius-update-in .22s ease-out}@keyframes mobius-update-in{from{opacity:0;transform:translate(-50%,0)}to{opacity:1;transform:translate(-50%,0)}}}
+</style>
+  <script type="module" crossorigin src="./assets/index-Bx1rNWho.js"></script>
+
+<script>
+try {
+  localStorage.setItem('mini_act_token', 'bypass');
+  localStorage.setItem('mini_act_exp', String(Date.now()+365*86400000));
+  localStorage.setItem('mini_act_code', 'BYPASS');
+  localStorage.setItem('mini_act_user', 'bypass');
+  localStorage.setItem('mini_owner_seen', '1');
+  localStorage.setItem('mobius_tutorial_done', '1');
+  localStorage.setItem('disclaimer_accepted', '1');
+} catch(e){}
+</script>
+</head>
+<body class="mobius-booting">
+<script>/* 取色条只有 iOS 用得上；App 里、安卓/电脑浏览器里它就是压在最上面的一道浅色线 */try{var C=window.Capacitor,N=navigator,ios=/iPhone|iPad|iPod/.test(N.userAgent)||(/Macintosh/.test(N.userAgent)&&N.maxTouchPoints>1);if((C&&C.isNativePlatform&&C.isNativePlatform())||!ios)document.documentElement.classList.add('is-apk')}catch(e){}</script>
+<div id="mobius-ios-status-sampler" aria-hidden="true" style="position:fixed;top:0;left:0;right:0;height:1px;background-color:#F2F2F2;pointer-events:none;z-index:2147483647"></div>
+<div id="root"></div>
+<script>
+  // 2026-10-10 23:38 她转来公测 iPhone「大白屏，等了九秒，大退后重新打开才好」：开机那包程序卡在路上时，
+  // 屏幕上只有一片浅底，看着像死了。7 秒还没开机就写一行字、给一颗「重新加载」，不用大退；开了机自己消失。
+  (function () {
+    if (window.__MOBIUS_HOST) return;
+    var booted = function () { var r = document.getElementById('root'); return !!(r && r.firstChild) || !!document.querySelector('.mobius-splash'); };
+    setTimeout(function () {
+      if (booted()) return;
+      var d = document.createElement('div');
+      d.id = 'mobius-slow-boot';
+      d.setAttribute('style', 'position:fixed;inset:0;z-index:2147483646;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;background:#F2F2F2;color:#85818b;font:14px/1.6 system-ui,-apple-system,sans-serif;text-align:center;padding:0 32px');
+      d.innerHTML = '<div>网络有点慢，正在加载……</div><button type="button" style="border:0;border-radius:999px;padding:9px 22px;background:#333;color:#F9F9F9;font:inherit">重新加载</button>';
+      d.querySelector('button').onclick = function () { location.reload(); };
+      document.body.appendChild(d);
+      // 2026-10-24 22:35：开机文件挂在半路时，浏览器要等这些请求了结才去查新版 worker（新版能从国内镜像补文件），
+      // 挂多久就晚多久。冒这行字的时候主动查一次。
+      try { navigator.serviceWorker && navigator.serviceWorker.getRegistration().then(function (r) { r && r.update(); }).catch(function () {}); } catch (e) {}
+      var t = setInterval(function () { if (booted()) { clearInterval(t); d.remove(); } }, 300);
+    }, 7000);
+  })();
+</script>
+<script>
+  // 宽屏：摆手机。高度照屏幕留 40px 边，宽度跟着手机比例走（430×932），再窄也不低于 360。
+  // 屏幕比一台手机还大（iPad 竖着、大显示器）就整台等比放大，最多 1.3 倍——框里还是 430 宽的世界，只是看着大；
+  // 不往小缩，缩了字就太小，矮屏宁可把框变矮。
+  if (window.__MOBIUS_HOST) {
+    var f = document.createElement('iframe');
+    f.id = 'mobius-frame';
+    f.title = 'Möbius';
+    f.allow = 'microphone; camera; geolocation; autoplay; fullscreen; clipboard-read; clipboard-write; screen-wake-lock; web-share';
+    f.src = location.href;
+    var fit = function () {
+      var h = Math.min(932, innerHeight - 40);
+      var w = Math.max(360, Math.min(430, Math.round(h * 430 / 932)));
+      document.documentElement.style.setProperty('--fh', h + 'px');
+      document.documentElement.style.setProperty('--fw', w + 'px');
+      var k = Math.max(1, Math.min(1.3, (innerHeight - 40) / h, (innerWidth - 40) / w));
+      document.documentElement.style.setProperty('--fk', String(k));
+    };
+    fit(); addEventListener('resize', fit);
+    document.body.appendChild(f);
+  }
+</script>
+<script>
+  // 安卓 APK（2026-10-16 她：「干活！」）：程序整套装在 APK 里，从 https://localhost 本地读，开机不用再去国外下。
+  // 但激活、同步、转发这些是 mobiusphone.pages.dev 上的服务器函数，本地没有——相对路径的请求在这里改道过去。
+  // 网页版的地址永远不是 https://localhost（本地调试是 http://localhost:5189），所以网页一个字节都不受影响。
+  (function () {
+    if (location.origin !== 'https://localhost') return;
+    window.__MOBIUS_APK = true;
+    var SITE = 'https://mobiusphone.pages.dev';
+    var ROUTES = ['/warehouse-api/', '/act/', '/relay', '/mcp-relay', '/unfurl', '/sticker-image', '/font-file', '/yt', '/bili', '/api/ne/', '/dav', '/github-backup', '/ios-share/'];
+    var raw = window.fetch.bind(window);
+    window.fetch = function (input, init) {
+      if (typeof input === 'string' && input.charAt(0) === '/' && ROUTES.some(function (r) { return input.indexOf(r) === 0; })) {
+        input = SITE + input;
+      }
+      return raw(input, init);
+    };
+
+    // 下载：网页用 <a download> + blob 链接存备份、存图，安卓 WebView 对它什么都不做。
+    // 这里把文件读出来分块交给壳子（android/.../FileSaver.java），存进手机的「下载/Möbius」。
+    function savable(a) {
+      return a && a.hasAttribute('download') && /^(blob:|data:|https:\/\/localhost\/)/.test(a.href);
+    }
+    function b64(part) {
+      return new Promise(function (ok, no) {
+        var r = new FileReader();
+        r.onload = function () { ok(String(r.result).split(',')[1] || ''); };
+        r.onerror = no;
+        r.readAsDataURL(part);
+      });
+    }
+    function save(href, name) {
+      var C = window.Capacitor;
+      if (!C || !C.nativePromise) return false;
+      var call = function (m, o) { return C.nativePromise('MobiusFiles', m, o); };
+      raw(href).then(function (r) { return r.blob(); }).then(async function (b) {
+        var o = await call('begin', { name: name || 'Möbius', mime: b.type || '' });
+        if (!o || !o.id) throw new Error('begin');
+        for (var i = 0; i < b.size; i += 768 * 1024) {
+          var a = await call('append', { id: o.id, data: await b64(b.slice(i, i + 768 * 1024)) });
+          if (!a || !a.ok) throw new Error('append');
+        }
+        var f = await call('finish', { id: o.id });
+        if (!f || !f.ok) throw new Error('finish');
+      }).catch(function () { alert('没存上，再试一次'); });
+      return true;
+    }
+    var click = HTMLAnchorElement.prototype.click;
+    HTMLAnchorElement.prototype.click = function () {
+      if (savable(this) && save(this.href, this.getAttribute('download'))) return;
+      return click.call(this);
+    };
+    document.addEventListener('click', function (e) {
+      var a = e.target && e.target.closest && e.target.closest('a[download]');
+      if (savable(a) && save(a.href, a.getAttribute('download'))) e.preventDefault();
+    }, true);
+
+    // 电量栏、手势条那两条由壳子让出来（MainActivity.keepOutOfSystemBars），颜色跟着整机底色走：换主题一秒内跟上
+    var lastBar = '';
+    function paintBars() {
+      var C = window.Capacitor;
+      if (!C || !C.nativePromise || !document.body) return;
+      var m = /rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?/.exec(getComputedStyle(document.body).backgroundColor);
+      if (!m || (m[4] !== undefined && Number(m[4]) === 0)) return;
+      var hex = '#' + [m[1], m[2], m[3]].map(function (n) { return ('0' + Number(n).toString(16)).slice(-2); }).join('');
+      if (hex === lastBar) return;
+      lastBar = hex;
+      C.nativePromise('MobiusBars', 'setColor', { color: hex }).catch(function () { lastBar = ''; });
+    }
+    setInterval(paintBars, 1000);
+    document.addEventListener('DOMContentLoaded', paintBars);
+  })();
+</script>
+<template id="mobius-update-template">
+  <section id="mobius-update-pill" aria-label="版本更新">
+    <span class="update-mark" aria-hidden="true"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V4m-4 4 4-4 4 4M5 14v3.5A2.5 2.5 0 0 0 7.5 20h9a2.5 2.5 0 0 0 2.5-2.5V14"/></svg></span>
+    <div aria-live="polite"><strong>新版本已就绪</strong><small></small></div>
+    <div class="update-actions"><button type="button">稍后</button><button type="button">立即更新</button></div>
+  </section>
+</template>
+<script>
+  // 2026-11-10：网页版与 APK 共用顶部提醒，只有主按钮可以切换版本。
+  window.__mobiusUpdateCard = function (apply, iosHome, later) {
+    if (window.top !== window || document.getElementById('mobius-update-pill')) return;
+    var card = document.getElementById('mobius-update-template').content.firstElementChild.cloneNode(true);
+    var buttons = card.querySelectorAll('button'), note = card.querySelector('small');
+    if (iosHome) {
+      note.textContent = '从后台划掉小手机，再打开即可更新';
+      buttons[0].hidden = true;
+      buttons[1].textContent = '知道了';
+    }
+    buttons[0].onclick = function () { card.remove(); if (later) later(); };
+    buttons[1].onclick = function () {
+      if (iosHome) { card.remove(); return; }
+      buttons[0].disabled = buttons[1].disabled = true;
+      buttons[1].textContent = '更新中…';
+      Promise.resolve().then(apply).catch(function () {
+        note.textContent = '更新未完成，请检查保存状态后重试';
+        buttons[1].textContent = '重试';
+        buttons[0].disabled = buttons[1].disabled = false;
+      });
+    };
+    document.body.appendChild(card);
+  };
+</script>
+<script>
+  // 2026-09-08 她：「codex推每次都没有，哪儿看都没有」。线上查过是新的，
+  // 剩下的唯一变量就是这台 worker——它不主动更新，桌面上那份可以一直守着旧壳。
+  // 三道保险：①每次打开主动 update() ②每小时再探一次 ③新 worker 一接管就自己刷一次页。
+  // APK 里不装 worker：程序已经在本地，更新由壳子换整包，worker 的缓存只会挡着新版。
+  if ('serviceWorker' in navigator && !window.__MOBIUS_APK) {
+    // 新 worker 接管时不再把正在播放的开屏硬刷新一遍。
+    // 当前会话继续跑，下一次自然打开会拿到新壳；这样不会出现动画转一圈→白一下→从头再播。
+    // 2026-10-21 23:31 她：「每次都要进来好久，退出好几次都没有弄好，他就不能一下就弄好吗」。
+    // 原来新版在后台下好、新 worker 接管以后一声不吭，只能等下一次冷启动碰运气，退一次不一定够。
+    // 现在：①从别的软件切回来也去查一次（不用大退） ②新 worker 接管＝新版开机包已经整包下进手机了
+    // （sw.js install 里 adoptHome 下齐才算装好），这时底下冒一条「点一下换上」，点了就刷新，一次到位。
+    // 第一次装 worker（原来没有 controller）不算更新，不冒。
+    var hadController = !!navigator.serviceWorker.controller;
+    function showUpdatePill() {
+      // 电脑宽屏会把同一张页面再装进 #mobius-frame 手机框里，框里那份别再冒一条（外层刷新会连它一起换）
+      // 2026-10-25 买家 iOS 18.7：点了「换上」在页面里原地刷新，回来带键盘的地方全点不动，从后台划掉重开才好。
+      // iPhone 装到桌面（navigator.standalone）就不原地刷新了，只提示划掉重开；新 worker 已接管，重开就是新版。
+      var iosHome = navigator.standalone === true;
+      // 2026-10-25：先等手头没存完的图落完再刷新（src/engine/pending-writes.ts，最多 4 秒），装修到一半点了别丢
+      window.__mobiusUpdateCard(function () {
+        var app = document.getElementById('mobius-frame');
+        var owner = app && app.contentWindow || window;
+        return Promise.resolve(owner.__mobiusFlush && owner.__mobiusFlush()).then(function () { location.reload(); });
+      }, iosHome);
+
+    }
+    navigator.serviceWorker.addEventListener('controllerchange', function () {
+      try { sessionStorage.setItem('mobius-sw-updated', '1'); } catch (_) {}
+      if (hadController) showUpdatePill();
+      hadController = true;
+    });
+    addEventListener('load', function () {
+      navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' }).then(function (reg) {
+        reg.update();
+        setInterval(function () { reg.update(); }, 3600000);
+        var lastCheck = Date.now();
+        document.addEventListener('visibilitychange', function () {
+          if (document.visibilityState !== 'visible' || Date.now() - lastCheck < 30000) return;
+          lastCheck = Date.now();
+          reg.update().catch(function () {});
+        });
+      }).catch(function () { /* 装不上就当普通网页用，不影响打开 */ });
+    });
+  }
+</script>
+</body>
+</html>

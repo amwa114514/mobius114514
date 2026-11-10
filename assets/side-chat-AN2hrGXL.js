@@ -1,0 +1,3 @@
+import{C as e,Et as t,K as n,S as r,_ as i}from"./switches-o5ms4NdG.js";function a(a){let o=a.split(`
+`).map(e=>{let[t,n]=r(e);return n?t+`【译】`+n:e}).join(`
+`),s=[];return e(o,{think:!0,translate:!0}).units.map(e=>{let[t,r]=n(e.body,e.trans);return{body:t,trans:r}}).filter(e=>!e.trans&&t(e.body,s)?!1:(e.trans&&i(e.body)&&s.push(e.trans),!0))}var o=`外语对白在原字符串内紧跟【译】简体中文译文；只翻译公开台词，不改变JSON字段、标识、目标和判定值。`;export{a as n,o as t};
